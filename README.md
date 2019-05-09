@@ -1,7 +1,10 @@
-# canjson
+# json
 
-This is a copy of the encoding/json stdlib package with the following changes:
+This is a copy of the golang stdlib encoding/json package with the options:
 
-- Doesn't escape HTML or unicode by default
-- Keys are ordered by tag name, not the order in struct
-- Encode: A newline is not appended
+```golang
+json.Marshal(i,
+    json.EscapeHTML(false),           // Disable escaping
+    json.TerminateNewline(false),     // Don't append newline
+    json.FieldOrder(json.NameOrder))  // Order by field name
+```
