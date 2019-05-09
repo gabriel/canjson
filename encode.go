@@ -155,10 +155,11 @@ import (
 // handle them. Passing cyclic structures to Marshal will result in
 // an infinite recursion.
 //
-func Marshal(v interface{}) ([]byte, error) {
+func Marshal(v interface{}, opts ...EncodeOpt) ([]byte, error) {
 	e := newEncodeState()
 
-	err := e.marshal(v, encOpts{escapeHTML: true})
+	opt := unpackEncOpts(opts, &encOpts{escapeHTML: true, terminateNewline: true})
+	err := e.marshal(v, *opt)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +169,46 @@ func Marshal(v interface{}) ([]byte, error) {
 	encodeStatePool.Put(e)
 
 	return buf, nil
+}
+
+// EncodeOpt are options for encoding
+type EncodeOpt func(*encOpts)
+
+// EscapeHTML causes '<', '>', and '&' to be escaped in JSON strings.
+func EscapeHTML(b bool) EncodeOpt {
+	return func(o *encOpts) {
+		o.escapeHTML = b
+	}
+}
+
+// Quoted causes primitive fields to be encoded inside JSON strings.
+func Quoted(b bool) EncodeOpt {
+	return func(o *encOpts) {
+		o.quoted = b
+	}
+}
+
+// TerminateNewline appends '\n' to each encoded value.
+func TerminateNewline(b bool) EncodeOpt {
+	return func(o *encOpts) {
+		o.terminateNewline = b
+	}
+}
+
+// FieldOrder describes how fields are ordered
+func FieldOrder(fo Order) EncodeOpt {
+	return func(o *encOpts) {
+		o.fieldOrder = fo
+	}
+}
+
+func unpackEncOpts(opts []EncodeOpt, eopt *encOpts) *encOpts {
+	for _, o := range opts {
+		if o != nil {
+			o(eopt)
+		}
+	}
+	return eopt
 }
 
 // MarshalIndent is like Marshal but applies Indent to format the output.
@@ -337,11 +378,25 @@ func (e *encodeState) reflectValue(v reflect.Value, opts encOpts) {
 	valueEncoder(v)(e, v, opts)
 }
 
+// Order describes how to order fields
+type Order string
+
+const (
+	// IndexOrder ...
+	IndexOrder Order = ""
+	// NameOrder ...
+	NameOrder Order = "name"
+)
+
 type encOpts struct {
 	// quoted causes primitive fields to be encoded inside JSON strings.
 	quoted bool
 	// escapeHTML causes '<', '>', and '&' to be escaped in JSON strings.
 	escapeHTML bool
+	// terminateNewline appends '\n' to each encoded value.
+	terminateNewline bool
+	// fieldOrder describes how fields are ordered
+	fieldOrder Order
 }
 
 type encoderFunc func(e *encodeState, v reflect.Value, opts encOpts)
@@ -633,10 +688,17 @@ type structFields struct {
 }
 
 func (se structEncoder) encode(e *encodeState, v reflect.Value, opts encOpts) {
+	fields := se.fields.list
+	if opts.fieldOrder == NameOrder {
+		fieldsCopy := append(fields[:0:0], fields...)
+		sort.Slice(fieldsCopy, func(i, j int) bool { return fieldsCopy[i].name < fieldsCopy[j].name })
+		fields = fieldsCopy
+	}
+
 	next := byte('{')
 FieldLoop:
-	for i := range se.fields.list {
-		f := &se.fields.list[i]
+	for i := range fields {
+		f := &fields[i]
 
 		// Find the nested struct field by following f.index.
 		fv := v

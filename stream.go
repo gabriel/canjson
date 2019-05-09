@@ -194,12 +194,13 @@ func NewEncoder(w io.Writer) *Encoder {
 //
 // See the documentation for Marshal for details about the
 // conversion of Go values to JSON.
-func (enc *Encoder) Encode(v interface{}) error {
+func (enc *Encoder) Encode(v interface{}, opts ...EncodeOpt) error {
 	if enc.err != nil {
 		return enc.err
 	}
+	opt := unpackEncOpts(opts, &encOpts{escapeHTML: enc.escapeHTML, terminateNewline: true})
 	e := newEncodeState()
-	err := e.marshal(v, encOpts{escapeHTML: enc.escapeHTML})
+	err := e.marshal(v, *opt)
 	if err != nil {
 		return err
 	}
@@ -210,7 +211,9 @@ func (enc *Encoder) Encode(v interface{}) error {
 	// is required if the encoded value was a number,
 	// so that the reader knows there aren't more
 	// digits coming.
-	e.WriteByte('\n')
+	if opt.terminateNewline {
+		e.WriteByte('\n')
+	}
 
 	b := e.Bytes()
 	if enc.indentPrefix != "" || enc.indentValue != "" {
