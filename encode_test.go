@@ -1023,3 +1023,26 @@ func TestMarshalUncommonFieldNames(t *testing.T) {
 		t.Fatalf("Marshal: got %s want %s", got, want)
 	}
 }
+
+func TestMarshalCanonical(t *testing.T) {
+	v := struct {
+		Z string `json:"z"`
+		A int    `json:"a"`
+		B bool   `json:"b"`
+		C int    `json:"c"`
+	}{
+		Z: `<>&🤓\"`,
+		A: 1,
+		B: true,
+		C: -0,
+	}
+
+	b, marshalErr := MarshalCanonical(v)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	want := `{"a":1,"b":true,"c":0,"z":"<>&🤓\\\""}`
+	if want != string(b) {
+		t.Fatalf("MarshalCanonical: got %s want %s", string(b), want)
+	}
+}

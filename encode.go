@@ -171,6 +171,18 @@ func Marshal(v interface{}, opts ...EncodeOpt) ([]byte, error) {
 	return buf, nil
 }
 
+// MarshalCanonical returns the JSON canonical encoding of v. It uses Marshal
+// with the following options:
+//   - json.EscapeHTML(false)
+//   - json.TerminateNewline(false)
+//   - json.FieldOrder(json.NameOrder)
+func MarshalCanonical(v interface{}) ([]byte, error) {
+	return Marshal(v,
+		EscapeHTML(false),
+		TerminateNewline(false),
+		FieldOrder(NameOrder))
+}
+
 // EncodeOpt are options for encoding
 type EncodeOpt func(*encOpts)
 
